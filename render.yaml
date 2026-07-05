@@ -10,3 +10,5 @@ services:
         value: production
       - key: GEMINI_API_KEY
         sync: false  # Set your Gemini API key in the Render dashboard
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash  # Override here if you need a different model, no redeploy needed

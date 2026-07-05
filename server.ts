@@ -39,6 +39,9 @@ function writeHistory(data: any[]) {
   }
 }
 
+// Active Gemini model — override via GEMINI_MODEL env var if needed
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+
 // Initialize Google Gen AI
 let ai: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI {
@@ -114,9 +117,9 @@ app.post("/api/predict", async (req, res) => {
     const client = getGeminiClient();
 
     // Stage 1: Classify the leaf image using Gemini vision
-    console.log("Stage 1: Running leaf image classification...");
+    console.log(`Stage 1: Running leaf image classification with model: ${GEMINI_MODEL}`);
     const classificationResponse = await client.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: GEMINI_MODEL,
       contents: [
         {
           role: "user",
@@ -177,7 +180,7 @@ Return a JSON object conforming exactly to this schema:
     }
 
     // Stage 2: Generate detailed agricultural report
-    console.log(`Stage 2: Generating agricultural analysis for: ${fullName} (${confidence}%)`);
+    console.log(`Stage 2: Generating agricultural analysis for: ${fullName} (${confidence}%) with model: ${GEMINI_MODEL}`);
     const prompt = `You are an agricultural expert.
 A CNN model predicted:
 Disease/Condition: ${fullName}
@@ -205,7 +208,7 @@ Return a JSON object conforming exactly to this schema:
 }`;
 
     const reportResponse = await client.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: GEMINI_MODEL,
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
