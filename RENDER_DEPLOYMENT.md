@@ -61,9 +61,10 @@ Render does not host free-tier databases natively, so you must get a free cloud 
 3. Configure settings:
    - **Name**: `pest-detection-flask-api`
    - **Runtime**: `Python`
-   - **Build Command**: `pip install -r requirements.txt`
+   - **Build Command**: `npm install && npm run build && pip install -r requirements.txt`
    - **Start Command**: `gunicorn backend.app:app`
    - **Instance Type**: **Free**
+   *(Note: The build command compiles your React frontend first, then installs Python requirements. This allows your Python Flask backend to serve your beautiful interactive front-end on Render!)*
 4. Under **Environment Variables**, add:
    - **Key**: `MONGO_URI`
    - **Value**: *(Your MongoDB Atlas connection string from Part A)*

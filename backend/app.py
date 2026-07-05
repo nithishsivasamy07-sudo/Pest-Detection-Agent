@@ -2,7 +2,7 @@ import os
 import json
 import uuid
 import datetime
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from pymongo import MongoClient
@@ -312,6 +312,19 @@ def delete_history_item(record_id):
     if deleted:
         return jsonify({"success": True, "message": f"Deleted record {record_id}"})
     return jsonify({"error": "Record not found"}), 404
+
+# Serve React Frontend
+dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'dist'))
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_react(path):
+    if path != "" and os.path.exists(os.path.join(dist_dir, path)):
+        return send_from_directory(dist_dir, path)
+    elif path.startswith("api/"):
+        return jsonify({"error": "Not Found"}), 404
+    else:
+        return send_from_directory(dist_dir, 'index.html')
 
 if __name__ == '__main__':
     # On Windows, Flask's watchdog reloader can crash with WinError 10038 due to select() limitations.
