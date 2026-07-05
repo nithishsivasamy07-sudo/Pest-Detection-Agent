@@ -51,7 +51,7 @@ Render does not host free-tier databases natively, so you must get a free cloud 
 1. Sign up on [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/register).
 2. Create a free-tier M0 Cluster.
 3. Under **Database Access**, create a database user with a secure password.
-4. Under **Network Access**, add `0.0.0.0/32` (allow access from anywhere) so Render can connect to it.
+4. Under **Network Access**, add `0.0.0.0/0` (allow access from anywhere) so Render can connect to it.
 5. In your cluster dashboard, click **Connect** -> **Drivers** and copy your **Connection String**:
    `mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority`
 
