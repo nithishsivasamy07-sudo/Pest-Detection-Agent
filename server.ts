@@ -11,7 +11,7 @@ const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const HISTORY_FILE = path.join(process.cwd(), "history.json");
 
-// Middleware
+// Middleware — must be registered before any route handlers
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -48,14 +48,7 @@ function getGeminiClient(): GoogleGenAI {
     if (!key) {
       throw new Error("GEMINI_API_KEY environment variable is required");
     }
-    ai = new GoogleGenAI({
-      apiKey: key,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
+    ai = new GoogleGenAI({ apiKey: key });
   }
   return ai;
 }
@@ -81,12 +74,12 @@ app.delete("/api/history/:id", (req, res) => {
   const { id } = req.params;
   const history = readHistory();
   const updated = history.filter((item) => item.id !== id);
-  
+
   if (history.length === updated.length) {
     res.status(404).json({ error: "Record not found" });
     return;
   }
-  
+
   writeHistory(updated);
   res.json({ success: true, message: `Record ${id} deleted successfully` });
 });
@@ -94,16 +87,19 @@ app.delete("/api/history/:id", (req, res) => {
 // Crop disease prediction & description endpoint
 app.post("/api/predict", async (req, res) => {
   try {
+    // Debug log to confirm body is parsed
+    console.log("POST /api/predict — body keys:", Object.keys(req.body || {}));
+
     const { image, filename } = req.body;
     if (!image) {
-      res.status(400).json({ error: "No image data provided" });
+      res.status(400).json({ error: "No image file provided" });
       return;
     }
 
-    // Extract mime type and base64 string
-    const match = image.match(/^data:(image\/\w+);base64,(.+)$/);
+    // Extract mime type and base64 string from data URL
+    const match = image.match(/^data:(image\/[\w+]+);base64,(.+)$/);
     if (!match) {
-      res.status(400).json({ error: "Invalid image format" });
+      res.status(400).json({ error: "Invalid image format — expected a base64 data URL" });
       return;
     }
 
@@ -118,31 +114,36 @@ app.post("/api/predict", async (req, res) => {
 
     const client = getGeminiClient();
 
-    // Stage 1: Call Gemini to act as the PlantVillage CNN classifier
+    // Stage 1: Classify the leaf image using Gemini vision
     console.log("Stage 1: Running leaf image classification...");
     const classificationResponse = await client.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-1.5-flash",
       contents: [
         {
-          inlineData: {
-            mimeType,
-            data: base64Data,
-          },
-        },
-        {
-          text: `You are a CNN image classification model trained on the PlantVillage dataset for crop disease identification.
-          Analyze this leaf image.
-          If the image is not a plant leaf, or does not show a recognizable plant, identify it as "Unknown" crop with "No Leaf/Crop Detected".
-          Otherwise, identify the plant crop (such as Tomato, Pepper, Potato, Grape, Apple, Corn, etc.) and classify the leaf as either Healthy or with a specific disease.
-          Examples of typical classes: "Tomato Late Blight", "Tomato Early Blight", "Tomato Healthy", "Potato Early Blight", "Potato Late Blight", "Potato Healthy", "Pepper Bell Bacterial Spot", "Pepper Bell Healthy", "Apple Scab", "Apple Healthy", "Grape Black Rot", "Grape Healthy", "Corn Common Rust", "Corn Northern Leaf Blight", "Corn Healthy", etc.
-          
-          Return a JSON object conforming exactly to this schema:
-          {
-            "crop": "string (e.g., Tomato, Potato, Apple, Corn, Grape, Pepper Bell, etc.)",
-            "condition": "string (e.g., Late Blight, Early Blight, Healthy, Common Rust, Bacterial Spot, etc.)",
-            "fullName": "string (e.g., Tomato Late Blight, Corn Common Rust, or Pepper Bell Healthy)",
-            "confidence": number (a realistic floating-point percentage between 72.5 and 99.8 reflecting how clear the symptoms are)"
-          }`,
+          role: "user",
+          parts: [
+            {
+              inlineData: {
+                mimeType,
+                data: base64Data,
+              },
+            },
+            {
+              text: `You are a CNN image classification model trained on the PlantVillage dataset for crop disease identification.
+Analyze this leaf image.
+If the image is not a plant leaf, or does not show a recognizable plant, identify it as "Unknown" crop with "No Leaf/Crop Detected".
+Otherwise, identify the plant crop (such as Tomato, Pepper, Potato, Grape, Apple, Corn, etc.) and classify the leaf as either Healthy or with a specific disease.
+Examples of typical classes: "Tomato Late Blight", "Tomato Early Blight", "Tomato Healthy", "Potato Early Blight", "Potato Late Blight", "Potato Healthy", "Pepper Bell Bacterial Spot", "Pepper Bell Healthy", "Apple Scab", "Apple Healthy", "Grape Black Rot", "Grape Healthy", "Corn Common Rust", "Corn Northern Leaf Blight", "Corn Healthy", etc.
+
+Return a JSON object conforming exactly to this schema:
+{
+  "crop": "string (e.g., Tomato, Potato, Apple, Corn, Grape, Pepper Bell, etc.)",
+  "condition": "string (e.g., Late Blight, Early Blight, Healthy, Common Rust, Bacterial Spot, etc.)",
+  "fullName": "string (e.g., Tomato Late Blight, Corn Common Rust, or Pepper Bell Healthy)",
+  "confidence": number (a realistic floating-point percentage between 72.5 and 99.8 reflecting how clear the symptoms are)
+}`,
+            },
+          ],
         },
       ],
       config: {
@@ -170,41 +171,43 @@ app.post("/api/predict", async (req, res) => {
 
     // Handle case where image is not a plant leaf
     if (crop === "Unknown" || condition === "No Leaf/Crop Detected") {
-      res.status(400).json({ error: "The uploaded image does not appear to be a crop leaf. Please upload a clear photo of a crop leaf." });
+      res.status(400).json({
+        error: "The uploaded image does not appear to be a crop leaf. Please upload a clear photo of a crop leaf.",
+      });
       return;
     }
 
-    // Stage 2: Call Gemini to act as an agricultural expert to generate detailed report
+    // Stage 2: Generate detailed agricultural report
     console.log(`Stage 2: Generating agricultural analysis for: ${fullName} (${confidence}%)`);
     const prompt = `You are an agricultural expert.
-    A CNN model predicted:
-    Disease/Condition: ${fullName}
-    Confidence: ${confidence}%
+A CNN model predicted:
+Disease/Condition: ${fullName}
+Confidence: ${confidence}%
 
-    Provide the following details tailored specifically for this prediction:
-    1. Disease overview (brief explanation)
-    2. Symptoms (bullet points of visual indicators)
-    3. Causes (pathogen, environmental triggers)
-    4. Organic treatment (eco-friendly solutions, biological controls)
-    5. Chemical treatment (safe agricultural fungicides, chemicals, bactericides if applicable; suggest organic alternatives if healthy)
-    6. Prevention (farming tips to prevent future outbreak)
-    7. Farmer advice (practical next steps)
+Provide the following details tailored specifically for this prediction:
+1. Disease overview (brief explanation)
+2. Symptoms (bullet points of visual indicators)
+3. Causes (pathogen, environmental triggers)
+4. Organic treatment (eco-friendly solutions, biological controls)
+5. Chemical treatment (safe agricultural fungicides, chemicals, bactericides if applicable; suggest organic alternatives if healthy)
+6. Prevention (farming tips to prevent future outbreak)
+7. Farmer advice (practical next steps)
 
-    Keep the language clear, practical, and highly educational for farmers.
-    Return a JSON object conforming exactly to this schema:
-    {
-      "overview": "string (Disease overview/explanation)",
-      "symptoms": ["string (symptom 1)", "string (symptom 2)"],
-      "causes": ["string (cause 1)", "string (cause 2)"],
-      "organicTreatment": ["string (organic remedy 1)", "string (organic remedy 2)"],
-      "chemicalTreatment": ["string (chemical remedy 1)", "string (chemical remedy 2)"],
-      "prevention": ["string (preventive action 1)", "string (preventive action 2)"],
-      "farmerAdvice": "string (practical next step summary)"
-    }`;
+Keep the language clear, practical, and highly educational for farmers.
+Return a JSON object conforming exactly to this schema:
+{
+  "overview": "string",
+  "symptoms": ["string"],
+  "causes": ["string"],
+  "organicTreatment": ["string"],
+  "chemicalTreatment": ["string"],
+  "prevention": ["string"],
+  "farmerAdvice": "string"
+}`;
 
     const reportResponse = await client.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: prompt,
+      model: "gemini-1.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -238,17 +241,17 @@ app.post("/api/predict", async (req, res) => {
 
     const reportResult = JSON.parse(reportText.trim());
 
-    // Save prediction record to local database
+    // Save prediction record
     const newRecord = {
       id: "rec_" + Math.random().toString(36).substring(2, 11),
-      filename,
+      filename: filename || "upload",
       crop,
       condition,
       disease: fullName,
-      confidence: parseFloat(confidence.toFixed(2)),
+      confidence: parseFloat(Number(confidence).toFixed(2)),
       timestamp: new Date().toISOString(),
       report: reportResult,
-      image, // Store thumbnail image (base64) for history listing
+      image, // base64 thumbnail stored for history display
     };
 
     const history = readHistory();
@@ -262,7 +265,7 @@ app.post("/api/predict", async (req, res) => {
   }
 });
 
-// Vite middleware integration
+// Vite middleware / static file serving
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -273,13 +276,14 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    // SPA fallback — must come after API routes
+    app.get("*", (_req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Pest Detection Agent Server running on http://0.0.0.0:${PORT}`);
+    console.log(`Pest Detection Agent running on http://0.0.0.0:${PORT}`);
   });
 }
 
