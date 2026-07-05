@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 
@@ -14,15 +13,6 @@ const HISTORY_FILE = path.join(process.cwd(), "history.json");
 // Middleware — must be registered before any route handlers
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
-
-// Catch body-parser errors (e.g. payload too large) and return JSON instead of crashing
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (err.type === "entity.too.large") {
-    res.status(413).json({ error: "Image too large. Please use an image smaller than 5MB." });
-    return;
-  }
-  next(err);
-});
 
 // Ensure history file exists
 if (!fs.existsSync(HISTORY_FILE)) {
@@ -277,6 +267,8 @@ Return a JSON object conforming exactly to this schema:
 // Vite middleware / static file serving
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    // Dynamically import vite only in dev — not bundled in production
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -297,3 +289,13 @@ async function startServer() {
 }
 
 startServer();
+
+// Global error handler — must be registered after all routes
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err.type === "entity.too.large") {
+    res.status(413).json({ error: "Image too large. Please use an image smaller than 5MB." });
+    return;
+  }
+  console.error("Unhandled error:", err);
+  res.status(500).json({ error: err.message || "Internal Server Error" });
+});
