@@ -6,7 +6,13 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from pymongo import MongoClient
-import tensorflow as tf
+# Try to import tensorflow safely
+tf = None
+try:
+    import tensorflow as tf
+except ImportError:
+    print("Warning: TensorFlow is not installed. CNN prediction is disabled and will fall back to simulated/mock mode.")
+
 import numpy as np
 from PIL import Image
 import google.generativeai as genai
@@ -40,14 +46,17 @@ if GEMINI_API_KEY:
 # Load CNN Model (Safe Load)
 MODEL_PATH = os.getenv("MODEL_PATH", "models/plantvillage_cnn.h5")
 model = None
-if os.path.exists(MODEL_PATH):
+if tf is not None and os.path.exists(MODEL_PATH):
     try:
         model = tf.keras.models.load_model(MODEL_PATH)
         print(f"CNN Model loaded successfully from {MODEL_PATH}")
     except Exception as e:
         print(f"Warning: Failed to load CNN model: {e}")
 else:
-    print(f"Warning: CNN Model file not found at {MODEL_PATH}. Prediction falls back to simulated/mock mode.")
+    if tf is None:
+        print("Warning: TensorFlow is not installed. Prediction falls back to simulated/mock mode.")
+    else:
+        print(f"Warning: CNN Model file not found at {MODEL_PATH}. Prediction falls back to simulated/mock mode.")
 
 # PlantVillage Class Labels
 CLASS_NAMES = [
