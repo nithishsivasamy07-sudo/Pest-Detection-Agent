@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: pest_detection_mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - pest_network
+    restart: always
+
+  flask_api:
+    build: .
+    container_name: pest_detection_api
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/
+      - GEMINI_API_KEY=YOUR_GOOGLE_GEMINI_API_KEY_HERE
+      - MODEL_PATH=models/plantvillage_cnn.h5
+    depends_on:
+      - mongodb
+    networks:
+      - pest_network
+    restart: always
+
+networks:
+  pest_network:
+    driver: bridge
+
+volumes:
+  mongo_data:

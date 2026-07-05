@@ -1,0 +1,6 @@
+{
+  "name": "Pest Detection Agent",
+  "description": "An AI-powered web application that identifies crop diseases from leaf images using a CNN model and provides Google Gemini-generated agricultural recommendations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
