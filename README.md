@@ -238,7 +238,7 @@ echo GEMINI_API_KEY=your_key_here > .env
 # 4. Start the development server
 npm run dev
 ```
-
+Open Live **[https://pest-detection-agent.onrender.com/](https://pest-detection-agent.onrender.com/)** in your browser.
 Open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
 The dev server uses Vite middleware with hot reload — no separate frontend build step is needed. The Express server dynamically imports Vite in dev mode only.
