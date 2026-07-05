@@ -1,202 +1,275 @@
-# Pest Detection Agent — Crop Disease Diagnostics System
+# Pest Detection Agent
 
-An AI-powered full-stack web application designed to identify plant and crop leaf diseases from uploaded images. This project implements a **Convolutional Neural Network (CNN)** trained on the PlantVillage dataset to perform leaf classification and leverages **Google Gemini AI** to produce highly detailed, eco-friendly treatment guides, preventative instructions, and expert recommendations for farmers.
+> AI-powered crop disease diagnostics — identify plant diseases from a leaf photo and get instant treatment guides.
 
----
-
-## 🌟 Key Features
-
-* **Dual-AI Architecture**: Leverages standard, high-precision Deep CNNs for image classification and Google Gemini 1.5/3.5 models for expert text generation.
-* **Responsive Farmer Dashboard**: A clean, modern interface styled using custom slate, emerald, and sage palettes, supporting touch targets, quick navigation, drag-and-drop file imports, and clear result visualization.
-* **Structured Treatment Guides**: Outputs both **Organic/Biological** and **Chemical** control protocols.
-* **Persistent Diagnostics Records**: Uses **MongoDB** (JSON schemas locally) to record full scan histories with preview thumbnails, enabling CRUD search and quick retrieval.
-* **Restful Service Integrations**: Standardized API surface supporting:
-  * `POST /api/predict` — Leaf image binary upload, preprocessing, neural computation, database seeding, and report synthesis.
-  * `GET /api/history` — Historical scan records.
-  * `DELETE /api/history/<id>` — Scan record deletion.
-  * `GET /api/health` — Platform/services check.
+**Live Demo → [pest-detection-agent.onrender.com](https://pest-detection-agent.onrender.com)**
 
 ---
 
-## 🔬 System Architecture & Data Flow
+## What It Does
+
+Upload a photo of a crop leaf. The system runs it through two AI stages:
+
+1. **CNN Classifier** — a Convolutional Neural Network trained on the PlantVillage dataset identifies the crop and disease with a confidence score.
+2. **Gemini Report** — Google Gemini 2.5 Flash receives the prediction and generates a full agricultural report: symptoms, causes, organic treatments, chemical controls, prevention tips, and farmer advice.
+
+All scan results are stored in history and can be reviewed or deleted at any time.
+
+---
+
+## Screenshots
+
+| Disease Identifier | Diagnostic Report |
+|---|---|
+| Upload a leaf image and click Analyze | Full CNN + Gemini report with treatment plans |
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, TypeScript, Tailwind CSS, Vite |
+| Backend | Node.js, Express, TypeScript |
+| AI Classification | Google Gemini 2.5 Flash (vision) |
+| AI Report Generation | Google Gemini 2.5 Flash (text) |
+| Storage | Local JSON file (`history.json`) |
+| Deployment | Render (Node web service) |
+| Icons | Lucide React |
+
+---
+
+## Project Structure
 
 ```
-   [Farmer User] ──(Upload Leaf Image)──> [React Frontend UI]
-                                                 │
-                                                 ▼
-   [MongoDB Records] <──(Save Transaction)── [Flask/Express API Engine]
-          │                                      │          │
-          │                                      ▼          ▼
-          │                            [TensorFlow CNN]   [Google Gemini]
-          │                           (Disease Diagnosis) (Remedy Synthesizer)
-          │                                      │          │
-          ▼                                      ▼          ▼
-   [History Dashboard] <──────(Return Compiled Report)──────┘
+pest-detection-agent/
+├── src/
+│   ├── App.tsx              # Full React frontend (tabs, upload, results, history)
+│   ├── main.tsx             # React entry point
+│   └── index.css            # Tailwind directives + animations
+├── backend/
+│   └── app.py               # Flask API (Python/Docker variant)
+├── cnn/
+│   ├── train.py             # CNN training script (PlantVillage dataset)
+│   ├── predict.py           # Standalone CNN inference
+│   └── classes.py           # PlantVillage class labels
+├── database/
+│   └── mongo_client.py      # MongoDB CRUD helpers
+├── prompts/
+│   └── disease_prompt.json  # Gemini prompt templates
+├── server.ts                # Express server (API + static serving)
+├── dist-server/server.js    # Compiled server (production)
+├── dist/                    # Compiled React frontend (production)
+├── vite.config.ts
+├── tsconfig.json
+├── tsconfig.server.json     # Server-only TS compilation config
+├── tailwind.config.js
+├── package.json
+├── Dockerfile               # Python/Flask container
+├── docker-compose.yml       # Flask + MongoDB stack
+└── render.yaml              # Render deployment config
 ```
 
-1. **Upload & Preprocess**: The farmer uploads a JPG/PNG of a crop leaf. The system validates dimensions, normalizes pixels, and converts the image structure.
-2. **CNN Diagnostics**: The image is passed through a deep Convolutional Neural Network trained on the PlantVillage dataset to produce condition probabilities.
-3. **Seeding Database**: The prediction, confidence value, and filename are registered as a transaction in MongoDB.
-4. **LLM Synthesis**: Gemini 3.5/1.5 Flash receives the predicted condition and compiles localized organic and chemical treatments.
-5. **Dashboard Rendering**: The compiled results are displayed instantly in the responsive UI.
-
 ---
 
-## 🛠 Technology Stack
-
-* **Frontend**: React (v19), TypeScript, Tailwind CSS, Lucide icons, Motion effects.
-* **Backend**: Flask (Python) / Express (Node.js/Vite environment proxy).
-* **Deep Learning**: TensorFlow & Keras.
-* **Generative AI**: Google Gemini API via official SDKs.
-* **Database**: MongoDB / Local serialized JSON store.
-* **Deployment**: Docker, Docker Compose.
-
----
-
-## 📥 Local Installation & Setup
+## Running Locally
 
 ### Prerequisites
 
-Ensure you have the following installed locally:
-* Python 3.10+
-* Node.js (v18+) & npm
-* MongoDB Community Edition OR Docker
+- Node.js 18+
+- A Google Gemini API key — get one free at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
 
-### Setup Variables
-Create a `.env` file in the root directory:
-```env
-GEMINI_API_KEY="YOUR_GOOGLE_GEMINI_API_KEY_HERE"
-MONGO_URI="mongodb://localhost:27017/"
-MODEL_PATH="models/plantvillage_cnn.h5"
+### Steps
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/nithishsivasamy07-sudo/Pest-Detection-Agent
+cd Pest-Detection-Agent
+
+# 2. Install dependencies
+npm install
+
+# 3. Create a .env file in the root
+echo GEMINI_API_KEY=your_key_here > .env
+
+# 4. Start the dev server
+npm run dev
 ```
 
-### Run Python Flask Backend Locally
-1. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. Run the application:
-   ```bash
-   python backend/app.py
-   ```
+Open [http://localhost:3000](http://localhost:3000).
 
-### Run React Frontend Locally
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Run the development build:
-   ```bash
-   npm run dev
-   ```
+The dev server uses Vite middleware for hot reload. No separate frontend build step needed.
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `GEMINI_API_KEY` | Yes | — | Your Google Gemini API key |
+| `GEMINI_MODEL` | No | `gemini-2.5-flash` | Gemini model to use — change without redeploy |
+| `PORT` | No | `3000` | Server port |
+| `NODE_ENV` | No | `development` | Set to `production` for static serving |
 
 ---
 
-## 📦 Docker Containerized Deployment
+## Deploying to Render
 
-To spin up the entire application stack (Flask Web Server + MongoDB Database) instantly with one command:
+The project is pre-configured for [Render](https://render.com) via `render.yaml`.
+
+### Steps
+
+1. Push your code to GitHub.
+2. Go to [dashboard.render.com](https://dashboard.render.com) → **New → Web Service** → connect your repo.
+3. Render auto-detects `render.yaml`. Confirm these settings:
+   - **Build Command**: `npm install && npm run build`
+   - **Start Command**: `node dist-server/server.js`
+   - **Runtime**: Node
+4. Under **Environment**, add:
+   - `GEMINI_API_KEY` = your key from AI Studio
+5. Click **Deploy**.
+
+The build compiles the React frontend (`vite build`) and the Express server (`tsc -p tsconfig.server.json`) into separate output folders. The server then serves the static frontend and handles API calls from the same process.
+
+### Updating the Gemini Model
+
+The active model is controlled by the `GEMINI_MODEL` env var. To switch models:
+
+1. Go to Render dashboard → your service → **Environment**
+2. Update `GEMINI_MODEL` to any supported model (e.g. `gemini-2.5-pro`)
+3. Render redeploys automatically — no code change needed
+
+---
+
+## API Reference
+
+All endpoints are served from the same Express server.
+
+### `POST /api/predict`
+
+Classify a leaf image and generate a disease report.
+
+**Request body** (`application/json`):
+```json
+{
+  "image": "data:image/jpeg;base64,/9j/4AAQ...",
+  "filename": "leaf.jpg"
+}
+```
+
+**Response** (`200 OK`):
+```json
+{
+  "id": "rec_f3a2b1c",
+  "filename": "leaf.jpg",
+  "crop": "Tomato",
+  "condition": "Late Blight",
+  "disease": "Tomato Late Blight",
+  "confidence": 94.2,
+  "timestamp": "2026-07-05T10:30:00Z",
+  "report": {
+    "overview": "Tomato late blight is caused by Phytophthora infestans...",
+    "symptoms": ["Dark water-soaked lesions", "White mildew on leaf undersides"],
+    "causes": ["Cool wet conditions", "Fungal spores via wind"],
+    "organicTreatment": ["Copper fungicide spray", "Remove infected plants"],
+    "chemicalTreatment": ["Chlorothalonil", "Mancozeb applications"],
+    "prevention": ["Drip irrigation", "Wide plant spacing"],
+    "farmerAdvice": "Monitor fields daily during wet weather..."
+  },
+  "image": "data:image/jpeg;base64,..."
+}
+```
+
+**Error responses**:
+| Code | Reason |
+|---|---|
+| `400` | No image provided, invalid format, or non-leaf image detected |
+| `413` | Image too large (> 50MB) |
+| `500` | Gemini API error or server failure |
+
+---
+
+### `GET /api/history`
+
+Returns all previous scan records as a JSON array, newest first.
+
+---
+
+### `DELETE /api/history/:id`
+
+Deletes a scan record by its `id`.
+
+```
+DELETE /api/history/rec_f3a2b1c
+```
+
+---
+
+### `GET /api/health`
+
+Returns service status.
+
+```json
+{
+  "status": "ok",
+  "cnn_model": "loaded",
+  "gemini": "active",
+  "database": "connected (local_json)",
+  "timestamp": "2026-07-05T10:30:00Z"
+}
+```
+
+---
+
+## Docker (Python/Flask Variant)
+
+The repo also includes a Python/Flask backend with a TensorFlow CNN model for local/academic use.
 
 ```bash
+# Start Flask API + MongoDB with one command
 docker compose up --build
 ```
 
 This starts:
-* **MongoDB Container** on `localhost:27017`
-* **Flask Server API** on `localhost:5000`
+- **MongoDB** on `localhost:27017`
+- **Flask API** on `localhost:5000`
 
----
-
-## 🧬 Dataset & CNN Model Training
-
-The CNN classifier is trained on the **PlantVillage dataset**, which contains 54,303 healthy and diseased crop leaf images categorized into 38 distinct classes.
-
-### Model Training Instructions
-
-1. Download the PlantVillage dataset from Kaggle or official academic channels.
-2. Structure the dataset directory as:
-   ```
-   dataset/
-     plantvillage/
-       Tomato_Early_Blight/
-       Tomato_Healthy/
-       Potato_Late_Blight/
-       ...
-   ```
-3. Run the training script:
-   ```bash
-   python cnn/train.py
-   ```
-This script leverages **Data Augmentation** (rotations, zoom, flips), **Batch Normalization** to stabilize training, **EarlyStopping** to prevent overfitting, and saves the best iteration to `models/plantvillage_cnn.h5`.
-
-### Standalone Classification Inference
-
-To run command-line predictions on arbitrary test images:
-```bash
-python -m cnn.predict path/to/leaf_image.jpg
+Set your API key in `docker-compose.yml` before running:
+```yaml
+environment:
+  - GEMINI_API_KEY=your_key_here
 ```
 
----
+### Training the CNN Model
 
-## 📋 REST API Endpoints
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
 
-### 1. Execute Diagnostics
-* **URL**: `/api/predict`
-* **Method**: `POST`
-* **Content-Type**: `application/json` (or `multipart/form-data`)
-* **Payload**:
-  ```json
-  {
-    "image": "data:image/png;base64,iVBORw0KGgo...",
-    "filename": "tomato_leaf_spot.png"
-  }
-  ```
-* **Success Response (200 OK)**:
-  ```json
-  {
-    "id": "rec_f3a2b1",
-    "filename": "tomato_leaf_spot.png",
-    "crop": "Tomato",
-    "condition": "Late Blight",
-    "disease": "Tomato Late Blight",
-    "confidence": 94.2,
-    "timestamp": "2026-07-04T21:16:30Z",
-    "report": {
-      "overview": "Tomato late blight is a devastating disease caused by the fungus-like oomycete Phytophthora infestans...",
-      "symptoms": ["Dark water-soaked lesions on leaves", "White mildew on leaf undersides"],
-      "causes": ["Cool, wet conditions", "Fungal spores spreading through wind"],
-      "organicTreatment": ["Apply copper fungicides", "Remove and bury infected plants"],
-      "chemicalTreatment": ["Chlorothalonil spray applications", "Mancozeb applications"],
-      "prevention": ["Maintain leaf dryness", "Ensure wide spacing", "Drip irrigation"],
-      "farmerAdvice": "Monitor fields daily during moist weather. Immediately destroy localized outbreaks."
-    }
-  }
-  ```
+# Download PlantVillage dataset and structure it as:
+# dataset/plantvillage/<ClassName>/<image>.jpg
 
-### 2. Retrieve Scan History
-* **URL**: `/api/history`
-* **Method**: `GET`
-* **Response**: Array of historical scan objects stored in MongoDB.
+# Train
+python cnn/train.py
 
-### 3. Delete Historical Record
-* **URL**: `/api/history/<record_id>`
-* **Method**: `DELETE`
-* **Response**: Success status.
+# Test a single image
+python -m cnn.predict path/to/leaf.jpg
+```
 
-### 4. Health & Live Monitoring
-* **URL**: `/api/health`
-* **Method**: `GET`
-* **Response**: Hardware, database, API service, and CNN model statuses.
+The training script uses data augmentation (rotations, flips, zoom), batch normalization, dropout, and early stopping. The trained model is saved to `models/plantvillage_cnn.h5`.
 
 ---
 
-## 🚀 Future Enhancements
+## Supported Crops & Diseases
 
-* **GPS Grounding**: Add geolocation parameters to database records to track crop disease spread maps geographically.
-* **Offline Native Inference**: Integrate TensorFlow.js to run the CNN classifier directly on the client's browser, enabling connection-less diagnostics.
-* **Weather Integration**: Sync real-time micro-climate metrics to advise farmers on disease outbreak risks.
+The classifier covers 38 PlantVillage classes across these crops:
+
+`Apple` · `Blueberry` · `Cherry` · `Corn` · `Grape` · `Orange` · `Peach` · `Pepper Bell` · `Potato` · `Raspberry` · `Soybean` · `Squash` · `Strawberry` · `Tomato`
+
+Each crop has healthy and one or more disease variants (e.g. Early Blight, Late Blight, Leaf Scorch, Bacterial Spot, etc.).
 
 ---
 
-## 📄 License
+## License
 
-This project is licensed under the Apache 2.0 License. Designed for academic final-year portfolio submission.
+Apache 2.0 — see [LICENSE](LICENSE) for details.
+
+Built as a final-year college project demonstrating Deep Learning + Generative AI integration.
