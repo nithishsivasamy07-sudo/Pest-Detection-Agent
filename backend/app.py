@@ -237,4 +237,8 @@ def delete_history_item(record_id):
         return jsonify({"error": f"Database delete failure: {e}"}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # On Windows, Flask's watchdog reloader can crash with WinError 10038 due to select() limitations.
+    # We disable the reloader on Windows to prevent this.
+    import sys
+    use_reloader = sys.platform != 'win32'
+    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=use_reloader)
