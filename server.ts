@@ -15,6 +15,15 @@ const HISTORY_FILE = path.join(process.cwd(), "history.json");
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// Catch body-parser errors (e.g. payload too large) and return JSON instead of crashing
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err.type === "entity.too.large") {
+    res.status(413).json({ error: "Image too large. Please use an image smaller than 5MB." });
+    return;
+  }
+  next(err);
+});
+
 // Ensure history file exists
 if (!fs.existsSync(HISTORY_FILE)) {
   fs.writeFileSync(HISTORY_FILE, JSON.stringify([], null, 2));

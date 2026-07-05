@@ -117,16 +117,40 @@ export default function App() {
       setErrorMsg("Invalid file format. Only JPG, JPEG, and PNG are accepted.");
       return;
     }
-    // Limit to 10MB
     if (file.size > 10 * 1024 * 1024) {
       setErrorMsg("File size too large. Maximum allowed size is 10MB.");
       return;
     }
 
     setImageFile(file);
+
+    // Resize + compress the image to max 800px and quality 0.75 before storing
+    // This keeps the base64 payload well under server body limits
     const reader = new FileReader();
     reader.onloadend = () => {
-      setImagePreview(reader.result as string);
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 800;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width > height) {
+            height = Math.round((height * MAX) / width);
+            width = MAX;
+          } else {
+            width = Math.round((width * MAX) / height);
+            height = MAX;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, width, height);
+        // Always output as JPEG for consistent smaller size
+        const compressed = canvas.toDataURL("image/jpeg", 0.75);
+        setImagePreview(compressed);
+      };
+      img.src = reader.result as string;
     };
     reader.readAsDataURL(file);
   };
