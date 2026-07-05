@@ -33,10 +33,51 @@ app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB limit
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Initialize MongoDB
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
-db_client = MongoClient(MONGO_URI)
-db = db_client["pest_detection_agent"]
-history_collection = db["scan_history"]
+MONGO_URI = os.getenv("MONGO_URI")
+HISTORY_FILE = os.path.join(os.getcwd(), "history.json")
+
+db_client = None
+db = None
+history_collection = None
+use_mongodb = False
+
+def load_local_history():
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error reading local history file: {e}")
+    return []
+
+def save_local_history(records):
+    try:
+        with open(HISTORY_FILE, 'w') as f:
+            json.dump(records, f, indent=2)
+    except Exception as e:
+        print(f"Error writing local history file: {e}")
+
+if MONGO_URI:
+    try:
+        print("Attempting to connect to MongoDB...")
+        # serverSelectionTimeoutMS prevents hanging during initial DNS resolution / connection attempts
+        db_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=3000)
+        # Check connection to trigger any DNS/authentication error early and catch it
+        db_client.server_info()
+        db = db_client["pest_detection_agent"]
+        history_collection = db["scan_history"]
+        use_mongodb = True
+        print("Connected to MongoDB successfully!")
+    except Exception as e:
+        print(f"Warning: MongoDB connection failed: {e}")
+        print("Falling back to local history.json file for data persistence.")
+        db_client = None
+        db = None
+        history_collection = None
+        use_mongodb = False
+else:
+    print("MONGO_URI not provided. Using local history.json file for data persistence.")
+
 
 # Initialize Google Gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -145,11 +186,13 @@ def health():
         "status": "ok",
         "cnn_model": "loaded" if model is not None else "simulated/mock",
         "gemini": "active" if GEMINI_API_KEY else "inactive",
-        "database": "connected" if mongo_connected() else "offline",
+        "database": "connected" if mongo_connected() else "offline (falling back to history.json)",
         "timestamp": datetime.datetime.utcnow().isoformat()
     })
 
 def mongo_connected():
+    if not use_mongodb or db_client is None:
+        return False
     try:
         db_client.server_info()
         return True
@@ -197,7 +240,7 @@ def predict():
         # 3. Request Gemini analysis
         gemini_report = generate_gemini_report(predicted_class, confidence)
 
-        # 4. Save to MongoDB
+        # 4. Save to database / local file
         record = {
             "id": str(uuid.uuid4()),
             "filename": filename,
@@ -209,10 +252,19 @@ def predict():
             "report": gemini_report
         }
 
-        try:
-            history_collection.insert_one(record.copy())
-        except Exception as e:
-            print(f"Failed to insert record into MongoDB: {e}")
+        if use_mongodb and history_collection is not None:
+            try:
+                history_collection.insert_one(record.copy())
+            except Exception as e:
+                print(f"Failed to insert record into MongoDB: {e}")
+                # Fallback save
+                local_records = load_local_history()
+                local_records.insert(0, record)
+                save_local_history(local_records)
+        else:
+            local_records = load_local_history()
+            local_records.insert(0, record)
+            save_local_history(local_records)
 
         # Remove '_id' if present before JSON return
         if '_id' in record:
@@ -224,26 +276,42 @@ def predict():
 
 @app.route('/api/history', methods=['GET'])
 def get_history():
-    try:
-        cursor = history_collection.find().sort("timestamp", -1)
-        records = []
-        for doc in cursor:
-            if '_id' in doc:
-                del doc['_id']
-            records.append(doc)
-        return jsonify(records)
-    except Exception as e:
-        return jsonify({"error": f"Database read failure: {e}"}), 500
+    if use_mongodb and history_collection is not None:
+        try:
+            cursor = history_collection.find().sort("timestamp", -1)
+            records = []
+            for doc in cursor:
+                if '_id' in doc:
+                    del doc['_id']
+                records.append(doc)
+            return jsonify(records)
+        except Exception as e:
+            print(f"Database read failure: {e}. Falling back to local history.")
+            return jsonify(load_local_history())
+    else:
+        return jsonify(load_local_history())
 
 @app.route('/api/history/<record_id>', methods=['DELETE'])
 def delete_history_item(record_id):
-    try:
-        result = history_collection.delete_one({"id": record_id})
-        if result.deleted_count == 0:
-            return jsonify({"error": "Record not found"}), 404
+    deleted = False
+    if use_mongodb and history_collection is not None:
+        try:
+            result = history_collection.delete_one({"id": record_id})
+            if result.deleted_count > 0:
+                deleted = True
+        except Exception as e:
+            print(f"Database delete failure: {e}. Trying local fallback.")
+
+    # Check local file fallback deletion
+    local_records = load_local_history()
+    filtered = [r for r in local_records if r.get('id') != record_id]
+    if len(filtered) < len(local_records):
+        save_local_history(filtered)
+        deleted = True
+
+    if deleted:
         return jsonify({"success": True, "message": f"Deleted record {record_id}"})
-    except Exception as e:
-        return jsonify({"error": f"Database delete failure: {e}"}), 500
+    return jsonify({"error": "Record not found"}), 404
 
 if __name__ == '__main__':
     # On Windows, Flask's watchdog reloader can crash with WinError 10038 due to select() limitations.
