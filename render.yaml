@@ -9,6 +9,4 @@ services:
       - key: NODE_ENV
         value: production
       - key: GEMINI_API_KEY
-        sync: false # User will input their own Gemini API key in Render dashboard
-      - key: APP_URL
-        value: https://pest-detection-agent.onrender.com
+        sync: false  # Set your Gemini API key in the Render dashboard
