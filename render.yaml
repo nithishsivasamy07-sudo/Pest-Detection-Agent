@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: pest-detection-agent
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GEMINI_API_KEY
+        sync: false # User will input their own Gemini API key in Render dashboard
+      - key: APP_URL
+        value: https://pest-detection-agent.onrender.com
